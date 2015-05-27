@@ -201,7 +201,30 @@ class AltimeterSettings(object):
         return self.__dict__.__str__()
 
 
+class Altimeter(object):
+    def __init__(self, usb_dev):
+        self._dev = usb_dev
+        self._settings = None
+
+    def settings(self, refresh=False):
+        if refresh or self._settings is None:
+            rs = query(self._dev, (Packet(0, PType.READ_SETTINGS),))
+            self._settings = AltimeterSettings(rs)
+
+            # FIXME: Better logging, and/or move to a test case
+            ssrs = self._settings.raw()
+            if len(rs) != len(ssrs)+1:
+                print "LENGTHS DIFFER: {0} {1}".format(len(rs), len(ssrs))
+            for i in xrange(len(ssrs)):
+                if rs[i].v != ssrs[i].v:
+                    print "BYTE {0} DIFFERS: {1} {2}".format(i, rs[i], ssrs[i])
+
+        return self._settings
+
+
 ########
+
+# TODO: Move most or all of these into the Altimeter object
 
 def packetList(t, vals):
     return [Packet(v, t) for v in vals]
@@ -234,11 +257,11 @@ def query(dev, packets):
         rs.append(p)
     return rs
 
-def read_flights(dev):
+def read_flights(alti):
     flights = []
     f = []
     for bi in xrange(0, 128):
-        rs = query(dev, packetList(PType.READ_BLOCK, [0, bi]))
+        rs = query(alti.dev, packetList(PType.READ_BLOCK, [0, bi]))
         if rs[0].v & 0xff == BlockType.EMPTY:
             break
         elif rs[0].v & 0xff == BlockType.FIRST:
@@ -270,7 +293,11 @@ if dev is None:
 clear_read_buffer(dev)
 write_packet(dev, Packet(0, PType.RESET))
 
-flights = read_flights(dev)
+alti = Altimeter(dev)
+alti.settings()
+
+# flights = []
+flights = read_flights(alti)
 
 for f in flights:
     zero = f[0].altitude_std()
