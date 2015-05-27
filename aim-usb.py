@@ -75,32 +75,31 @@ class Packet(object):
 
 
 class PressureReading(object):
-    # FIXME: These don't give the same readings as the Entacore software.
-    # Is there a way to get the device itself to output the results again?
+    # TODO: Allow selecting of imperial or metric units
 
-    def __init__(self, v):
+    def __init__(self, v, adcOffset=0):
         self.data = int(v)
+        self.offset = adcOffset
 
     def raw(self):
         return self.data
+
+    def voltage(self):
+        v = float(self.data + self.offset) / 3276.8
+        return v
 
     def pressure(self):
         """ This function is modeled on a 14-bit linear voltage measurement
         from 0 to 5 volts, measuring the output of a MPXA4115A pressure sensor.
 
-        MPXA's pressure transfer function is:
+        MPXA4115A's pressure transfer function is:
             Vout = Vs*(.009*P-.095) +- Error
         where:
-            Vs = 5.1 VDC
+            Vs = 5.1 VDC +- 0.25    (nominally, and in this usage exactly 5.0 VDC)
             P is absolute pressure (kPa) relative to a sealed vacuum
         """
-        v = float(self.data) / 3276.8
-        p = (v/5.1 + .095) / .009
+        p = (self.voltage()/5.0 + .095) / .009
         return p
-
-        return float(self.data)/150.40512 + 95/9
-
-        # return float(self.data)*(3125.0/470016) + 95/9
 
     def altitude_std(self):
         """ From NOAA: Pressure in millibars -> altitude in feet:
@@ -116,11 +115,11 @@ class PressureReading(object):
 
 
 class FlightEntry(object):
-    def __init__(self, pkt):
+    def __init__(self, pkt, adcOffset=0):
         if pkt.t != PType.RECORDING_DATA:
             raise ValueError("Expecting a RECORDING_DATA packet")
         self.data = pkt.v
-        self.p = PressureReading(self.pressure_raw())
+        self.p = PressureReading(self.pressure_raw(), adcOffset=adcOffset)
 
     def lineA(self):
         return bool(self.data & 0x8000)
@@ -270,7 +269,7 @@ def read_flights(alti):
             f = []
         for r in rs[1:-1]:
             if r.v != 0xffff:
-                f.append(FlightEntry(r))
+                f.append(FlightEntry(r, adcOffset=alti.settings().adcOffset))
     if f is not None:
         flights.append(f)
 
@@ -300,6 +299,9 @@ alti.settings()
 flights = read_flights(alti)
 
 for f in flights:
+#    for e in f:
+#        print "Raw: {0}   Voltage: {1}   Pressure: {2}   Alti: {3}".format(
+#                e.p.raw(), e.p.voltage(), e.p.pressure(), e.p.altitude_std())
     zero = f[0].altitude_std()
     mn = min(e.altitude_rel(f[0]) for e in f)
     mx = max(e.altitude_rel(f[0]) for e in f)
