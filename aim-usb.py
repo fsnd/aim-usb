@@ -22,10 +22,22 @@ while still:
         still=False
 
 dev.write(0x01, '\x00\x00\x01', 100)
-dev.write(0x01, '\x00\x00\x08', 100)
-reply=None
-while reply is None or reply[2] != 0x05:
-    reply = dev.read(0x81, 5, 2500)     # some responses take awhile
-    print ' '.join('{0:02x}'.format(b) for b in reply)
+
+for i in xrange(0, 3):
+    dev.write(0x01, '\x00\x00\x02', 100)
+    print '  >>> WRITE 00 00 02'
+#    reply=None
+#    while reply is None or reply[2] != 0x05:
+#        try:
+#            reply = dev.read(0x81, 5, 2500)     # some responses take awhile
+#        except:
+#            break
+#        print ' '.join('{0:02x}'.format(b) for b in reply)
+    dev.write(0x01, [i, 0, 2], 100)
+    print '  >>> WRITE {0:02x} 00 02'.format(i)
+    reply=None
+    while reply is None or reply[2] != 0x05:
+        reply = dev.read(0x81, 5, 2500)     # some responses take awhile
+        print ' '.join('{0:02x}'.format(b) for b in reply)
 
 
