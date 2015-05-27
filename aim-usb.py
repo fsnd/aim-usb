@@ -3,6 +3,17 @@
 import usb.core
 import usb.util
 
+
+# TODO: Make or find a proper Enum class that will auto-convert to/from string.
+
+class LineMode(object):
+    DISABLE     = 0
+    TIME        = 1
+    APOGEE      = 2
+    ALTITUDE    = 3
+    ASCEND_ALTI = 4
+
+
 class BlockType(object):
     FIRST       = 0x02
     NEXT        = 0x01
@@ -128,6 +139,66 @@ class FlightEntry(object):
 
     def altitude_rel(self, zero):
         return self.p.altitude_rel(zero)
+
+
+class AltimeterSettings(object):
+    def __init__(self, packets):
+        if not (len(packets) == 18 or
+                (len(packets) == 19 and packets[18].t == PType.COMPLETE)):
+            raise ValueError("Expecting 18 DATA packets")
+        cksum = ((packets[17].v<<8) + packets[16].v) & 0xffff
+        pktsum = (sum(p.v for p in packets[:16]) + 120) & 0xffff
+        if cksum != pktsum:
+            raise ValueError("Checksum failed: {0} != {1}".format(pktsum, cksum))
+
+        p = packets
+        self.maxSamples         = self._u16le(p[0:2])
+        self.autoStopEnable     = bool(p[2].v & 1)
+        self.launchDetectM      = self._u16le(p[3:5])
+        self.machInhibitDS      = self._u16le(p[5:7])
+        self.batMinDV           = self._u8(p[7:8])
+        self.adcOffset          = self._s16le(p[8:10])
+        self.lineAMode          = self._u8(p[10:11]) & 0x0f
+        self.lineBMode          = (self._u8(p[10:11]) >> 4) & 0x0f
+        self.lineAThreshold     = self._u16le(p[11:13])     # altitude(m) or delay(ds)
+        self.lineBThreshold     = self._u16le(p[13:15])     # altitude(m) or delay(ds)
+        self.beepImperial       = bool(p[15].v & 1)
+
+    def _u8(self, bs):
+        return (bs[0].v & 0xff)
+
+    def _s16le(self, bs):
+        u = self._u16le(bs)
+        return (u ^ 0x8000) - 0x8000
+
+    def _u16le(self, bs):
+        return ((bs[0].v & 0xff) + (bs[1].v << 8)) & 0xffff
+
+    def _pack_16le(self, v):
+        return [v & 0xff, (v >> 8) & 0xff]
+
+    def _pack_8(self, v):
+        return [v & 0xff]
+
+    def raw(self):
+        vs = []
+        vs.extend(self._pack_16le(self.maxSamples))
+        vs.extend(self._pack_8(-self.autoStopEnable))
+        vs.extend(self._pack_16le(self.launchDetectM))
+        vs.extend(self._pack_16le(self.machInhibitDS))
+        vs.extend(self._pack_8(self.batMinDV))
+        vs.extend(self._pack_16le(self.adcOffset))
+        vs.extend(self._pack_8((self.lineAMode & 0xf) +
+                               ((self.lineBMode & 0xf) << 4)))
+        vs.extend(self._pack_16le(self.lineAThreshold))
+        vs.extend(self._pack_16le(self.lineBThreshold))
+        vs.extend(self._pack_8(-self.beepImperial))
+        pktsum = (sum(vs) + 120) & 0xffff
+        vs.extend(self._pack_16le(pktsum))
+        return [Packet(v, PType.DATA) for v in vs]
+
+    def __str__(self):
+        return self.__dict__.__str__()
 
 
 ########
