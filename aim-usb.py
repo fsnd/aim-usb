@@ -60,6 +60,9 @@ class Packet(object):
 
 ########
 
+def packetList(t, vals):
+    return [Packet(v, t) for v in vals]
+
 def write_packet(dev, packet):
     print '  >>> WRITE ', packet
     dev.write(0x01, packet.raw(), 100)
@@ -78,6 +81,16 @@ def clear_read_buffer(dev):
         except:
             break
 
+def query(dev, packets):
+    rs = []
+    for p in packets:
+        write_packet(dev, p)
+    p = None
+    while p is None or p.t != PType.COMPLETE:
+        p = read_packet(dev)
+        rs.append(p)
+    return rs
+
 ########
 
 dev = usb.core.find(idVendor=0x3db, idProduct=0x0002)
@@ -94,9 +107,4 @@ if dev is None:
 clear_read_buffer(dev)
 write_packet(dev, Packet(0, PType.RESET))
 for i in xrange(0, 3):
-    write_packet(dev, Packet(0, PType.READ_BLOCK))
-    write_packet(dev, Packet(i, PType.READ_BLOCK))
-    reply=None
-    while reply is None or reply.t != PType.COMPLETE:
-        reply = read_packet(dev)
-
+    rs = query(dev, packetList(PType.READ_BLOCK, [0, i]))
