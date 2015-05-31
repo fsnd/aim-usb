@@ -2,11 +2,10 @@
 
 import usb.core
 import usb.util
+from enum import Enum
 
 
-# TODO: Make or find a proper Enum class that will auto-convert to/from string.
-
-class LineMode(object):
+class LineMode(Enum):
     DISABLE     = 0
     TIME        = 1
     APOGEE      = 2
@@ -14,13 +13,13 @@ class LineMode(object):
     ASCEND_ALTI = 4
 
 
-class BlockType(object):
+class BlockType(Enum):
     FIRST       = 0x02
     NEXT        = 0x01
     EMPTY       = 0xff
 
 
-class PType(object):
+class PType(Enum):
     DATA            = 0x0
     RESET           = 0x1
     READ_BLOCK      = 0x2
@@ -33,23 +32,6 @@ class PType(object):
     WRITE_SETTINGS  = 0x9
     FIRE_LINES      = 0xa
     RECORDING_DATA  = 0xb
-
-    def __init__(self, t):
-        if t < 0 or t > 0xb:
-            raise ValueError("Valid PType values are 0..11")
-        self.t = int(t)
-
-    def __int__(self):
-        return self.t
-
-    def __eq__(self, t):
-        return self.t == int(t)
-
-    def __ne__(self, t):
-        return self.t != int(t)
-
-    def value(self):
-        return self.t
 
 
 class Packet(object):
@@ -68,7 +50,7 @@ class Packet(object):
             self.t = PType(t)
 
     def raw(self):
-        return [self.v & 0xff, (self.v >> 8) & 0xff, int(self.t) & 0xff]
+        return [self.v & 0xff, (self.v >> 8) & 0xff, self.t.value & 0xff]
 
     def __str__(self):
         return str(self.raw())
@@ -261,9 +243,9 @@ def read_flights(alti):
     f = []
     for bi in xrange(0, 128):
         rs = query(alti.dev, packetList(PType.READ_BLOCK, [0, bi]))
-        if rs[0].v & 0xff == BlockType.EMPTY:
+        if BlockType(rs[0].v & 0xff) == BlockType.EMPTY:
             break
-        elif rs[0].v & 0xff == BlockType.FIRST:
+        elif BlockType(rs[0].v & 0xff) == BlockType.FIRST:
             if f:
                 flights.append(f)
             f = []
