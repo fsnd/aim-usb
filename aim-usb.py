@@ -96,7 +96,7 @@ class PressureReading(object):
         return self.altitude_std() - zero.altitude_std()
 
 
-class FlightEntry(object):
+class FlightSample(object):
     def __init__(self, pkt, adcOffset=0):
         if pkt.t != PType.RECORDING_DATA:
             raise ValueError("Expecting a RECORDING_DATA packet")
@@ -251,7 +251,7 @@ def read_flights(alti):
             f = []
         for r in rs[1:-1]:
             if r.v != 0xffff:
-                f.append(FlightEntry(r, adcOffset=alti.settings().adcOffset))
+                f.append(FlightSample(r, adcOffset=alti.settings().adcOffset))
     if f is not None:
         flights.append(f)
 
