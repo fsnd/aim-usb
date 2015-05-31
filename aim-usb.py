@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7 --
+#!/usr/bin/python3.4 --
 
 import usb.core
 import usb.util
@@ -195,10 +195,10 @@ class Altimeter(object):
             # FIXME: Better logging, and/or move to a test case
             ssrs = self._settings.raw()
             if len(rs) != len(ssrs)+1:
-                print "LENGTHS DIFFER: {0} {1}".format(len(rs), len(ssrs))
-            for i in xrange(len(ssrs)):
+                print("LENGTHS DIFFER: {0} {1}".format(len(rs), len(ssrs)))
+            for i in range(len(ssrs)):
                 if rs[i].v != ssrs[i].v:
-                    print "BYTE {0} DIFFERS: {1} {2}".format(i, rs[i], ssrs[i])
+                    print("BYTE {0} DIFFERS: {1} {2}".format(i, rs[i], ssrs[i]))
 
         return self._settings
 
@@ -211,14 +211,14 @@ def packetList(t, vals):
     return [Packet(v, t) for v in vals]
 
 def write_packet(dev, packet):
-    print '  >>> WRITE ', packet
+    print('  >>> WRITE {0}'.format(packet))
     dev.write(0x01, packet.raw(), 100)
 
 def read_packet(dev, timeout=2500):   # some responses take awhile
     s = dev.read(0x81, 4, timeout)
     assert(len(s) == 3)
     p = Packet(s)
-    # print '  <<< READ ', p
+    # print('  <<< READ {0}'.format(p))
     return p
 
 def clear_read_buffer(dev):
@@ -241,7 +241,7 @@ def query(dev, packets):
 def read_flights(alti):
     flights = []
     f = []
-    for bi in xrange(0, 128):
+    for bi in range(0, 128):
         rs = query(alti.dev, packetList(PType.READ_BLOCK, [0, bi]))
         if BlockType(rs[0].v & 0xff) == BlockType.EMPTY:
             break
@@ -282,10 +282,10 @@ flights = read_flights(alti)
 
 for f in flights:
 #    for e in f:
-#        print "Raw: {0}   Voltage: {1}   Pressure: {2}   Alti: {3}".format(
-#                e.p.raw(), e.p.voltage(), e.p.pressure(), e.p.altitude_std())
+#        print("Raw: {0}   Voltage: {1}   Pressure: {2}   Alti: {3}".format(
+#                e.p.raw(), e.p.voltage(), e.p.pressure(), e.p.altitude_std()))
     zero = f[0].altitude_std()
     mn = min(e.altitude_rel(f[0]) for e in f)
     mx = max(e.altitude_rel(f[0]) for e in f)
-    print "Zero: {zero:-12.3f}  PZero: {pz:-12.3f}  Min: {mn:-12.3f}  Max: {mx:-12.3f}".format(
-            zero=zero, pz=f[0].pressure(), mn=mn, mx=mx)
+    print("Zero: {zero:-12.3f}  PZero: {pz:-12.3f}  Min: {mn:-12.3f}  Max: {mx:-12.3f}".format(
+            zero=zero, pz=f[0].pressure(), mn=mn, mx=mx))
