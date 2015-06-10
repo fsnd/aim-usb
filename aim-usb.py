@@ -3,6 +3,7 @@
 import usb.core
 import usb.util
 from enum import Enum
+import sys
 
 
 class LineMode(Enum):
@@ -99,6 +100,9 @@ class PressureReading(object):
     def altitude_rel(self, zero):
         return self.altitude_std() - zero.altitude_std()
 
+    def __str__(self):
+        return '<{0:.3f} kPa | {1:.3f} ft Std Altitude>'.format(self.pressure(), self.altitude_std())
+
 
 class FlightSample(object):
     def __init__(self, pkt, adcOffset=0):
@@ -183,7 +187,10 @@ class AltimeterSettings(object):
         return [Packet(v, PType.DATA) for v in vs]
 
     def __str__(self):
-        return self.__dict__.__str__()
+        return ('{\n   ' +
+                '\n   '.join(('{0}: {1}'.format(k,self.__dict__[k])
+                           for k in sorted(self.__dict__)))
+                +'\n}')
 
 
 class AltimeterProto(object):
@@ -269,6 +276,25 @@ class Altimeter(object):
 
         return self._flightData
 
+    def pressure(self):
+        adcOffset = self.settings().adcOffset
+        rs = self._proto.query((Packet(0, PType.READ_PRESSURE),))
+        return PressureReading(rs[0].v, adcOffset=adcOffset)
+
+    def batVoltage(self):
+        rs = self._proto.query((Packet(0, PType.READ_BAT),))
+        return rs[0].v / 10.0
+
+    def emulateLaunch(self):
+        # FIXME: Need sample data to see how this works
+        pass
+
+    def fireLines(self):
+        self._proto.query((Packet(0, PType.FIRE_LINES),))
+
+    def eraseMemory(self):
+        self._proto.query((Packet(0, PType.ERASE_MEM),))
+
 
 ########
 
@@ -282,7 +308,9 @@ if dev is None:
 # intf = cfg[(0,0)]
 
 alti = Altimeter(dev)
-alti.settings()
+sys.stderr.write('Settings: {0}\n'.format(alti.settings()))
+sys.stderr.write('Pressure: {0}\n'.format(alti.pressure()))
+sys.stderr.write('Battery Voltage: {0}\n'.format(alti.batVoltage()))
 
 # flights = []
 flights = alti.flightData()
