@@ -56,6 +56,10 @@ class Packet(object):
         return str(self.raw())
 
 
+def packetList(t, vals):
+    return [Packet(v, t) for v in vals]
+
+
 class PressureReading(object):
     # TODO: Allow selecting of imperial or metric units
 
@@ -226,6 +230,7 @@ class Altimeter(object):
         self._dev = usb_dev
         self._proto = AltimeterProto(usb_dev)
         self._settings = None
+        self._flightData = None
 
     def settings(self, refresh=False):
         if refresh or self._settings is None:
@@ -242,32 +247,27 @@ class Altimeter(object):
 
         return self._settings
 
-
-########
-
-# TODO: Move most or all of these into the Altimeter object
-
-def packetList(t, vals):
-    return [Packet(v, t) for v in vals]
-
-def read_flights(alti):
-    flights = []
-    f = []
-    for bi in range(0, 128):
-        rs = query(alti.dev, packetList(PType.READ_BLOCK, [0, bi]))
-        if BlockType(rs[0].v & 0xff) == BlockType.EMPTY:
-            break
-        elif BlockType(rs[0].v & 0xff) == BlockType.FIRST:
-            if f:
-                flights.append(f)
+    def flightData(self, refresh=False):
+        # TODO: Turn into a lazy iterable?  Have to go two deep: data.flight[i].sample[j]
+        if refresh or self._flightData is None:
+            flights = []
             f = []
-        for r in rs[1:-1]:
-            if r.v != 0xffff:
-                f.append(FlightSample(r, adcOffset=alti.settings().adcOffset))
-    if f is not None:
-        flights.append(f)
+            for bi in range(0, 128):
+                rs = self._proto.query(packetList(PType.READ_BLOCK, [0, bi]))
+                if BlockType(rs[0].v & 0xff) == BlockType.EMPTY:
+                    break
+                elif BlockType(rs[0].v & 0xff) == BlockType.FIRST:
+                    if f:
+                        flights.append(f)
+                    f = []
+                for r in rs[1:-1]:
+                    if r.v != 0xffff:
+                        f.append(FlightSample(r, adcOffset=self.settings().adcOffset))
+            if f is not None:
+                flights.append(f)
+            self._flightData = flights
 
-    return flights
+        return self._flightData
 
 
 ########
@@ -285,7 +285,7 @@ alti = Altimeter(dev)
 alti.settings()
 
 # flights = []
-flights = read_flights(alti)
+flights = alti.flightData()
 
 for f in flights:
 #    for e in f:
