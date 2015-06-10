@@ -303,6 +303,10 @@ dev = usb.core.find(idVendor=0x3db, idProduct=0x0002)
 if dev is None:
     raise ValueError('Device not found')
 
+if dev.bcdDevice != 0x0160:
+    sys.stderr.write('Firmware version {0:x}.{1:02x} is not 1.60; take care!\n'
+            .format(dev.bcdDevice >> 8, dev.bcdDevice & 0xff))
+
 # dev.set_configuration()
 # cfg = dev.get_active_configuration()
 # intf = cfg[(0,0)]
