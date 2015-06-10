@@ -139,8 +139,8 @@ class AltimeterSettings(object):
         self.machInhibitDS      = self._u16le(p[5:7])
         self.batMinDV           = self._u8(p[7:8])
         self.adcOffset          = self._s16le(p[8:10])
-        self.lineAMode          = self._u8(p[10:11]) & 0x0f
-        self.lineBMode          = (self._u8(p[10:11]) >> 4) & 0x0f
+        self.lineAMode          = LineMode( self._u8(p[10:11]) & 0x0f )
+        self.lineBMode          = LineMode( (self._u8(p[10:11]) >> 4) & 0x0f )
         self.lineAThreshold     = self._u16le(p[11:13])     # altitude(m) or delay(ds)
         self.lineBThreshold     = self._u16le(p[13:15])     # altitude(m) or delay(ds)
         self.beepImperial       = bool(p[15].v & 1)
@@ -169,8 +169,8 @@ class AltimeterSettings(object):
         vs.extend(self._pack_16le(self.machInhibitDS))
         vs.extend(self._pack_8(self.batMinDV))
         vs.extend(self._pack_16le(self.adcOffset))
-        vs.extend(self._pack_8((self.lineAMode & 0xf) +
-                               ((self.lineBMode & 0xf) << 4)))
+        vs.extend(self._pack_8((self.lineAMode.value & 0xf) +
+                               ((self.lineBMode.value & 0xf) << 4)))
         vs.extend(self._pack_16le(self.lineAThreshold))
         vs.extend(self._pack_16le(self.lineBThreshold))
         vs.extend(self._pack_8(-self.beepImperial))
