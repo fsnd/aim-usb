@@ -182,14 +182,54 @@ class AltimeterSettings(object):
         return self.__dict__.__str__()
 
 
+class AltimeterProto(object):
+    def __init__(self, usb_dev):
+        # XXX: If two Protos get created for the same USB device, there's going
+        # to be a fight.
+        self._dev = usb_dev
+        self.clear_read_buffer()
+        self.write(Packet(0, PType.RESET))
+
+    def write(self, packet):
+        # print('  >>> WRITE {0}'.format(packet))
+        self._dev.write(0x01, packet.raw(), 100)
+
+    def read(self, timeout=2500):   # some responses take awhile
+        s = self._dev.read(0x81, 4, timeout)
+        assert(len(s) == 3)     # FIXME
+        p = Packet(s)
+        # print('  <<< READ {0}'.format(p))
+        return p
+
+    def clear_read_buffer(self):
+        while True:
+            try:
+                self.read(timeout=100)
+            except:
+                break
+
+    def query(self, packets):
+        rs = []
+        for p in packets:
+            self.write(p)
+        p = None
+        while p is None or p.t != PType.COMPLETE:
+            p = self.read()
+            # FIXME: what if timeout?  Return partial?
+            rs.append(p)
+        return rs
+
+
+
 class Altimeter(object):
     def __init__(self, usb_dev):
         self._dev = usb_dev
+        self._proto = AltimeterProto(usb_dev)
         self._settings = None
 
     def settings(self, refresh=False):
         if refresh or self._settings is None:
-            rs = query(self._dev, (Packet(0, PType.READ_SETTINGS),))
+            rs = self._proto.query([Packet(0, PType.READ_SETTINGS)])
             self._settings = AltimeterSettings(rs)
 
             # FIXME: Better logging, and/or move to a test case
@@ -209,34 +249,6 @@ class Altimeter(object):
 
 def packetList(t, vals):
     return [Packet(v, t) for v in vals]
-
-def write_packet(dev, packet):
-    print('  >>> WRITE {0}'.format(packet))
-    dev.write(0x01, packet.raw(), 100)
-
-def read_packet(dev, timeout=2500):   # some responses take awhile
-    s = dev.read(0x81, 4, timeout)
-    assert(len(s) == 3)
-    p = Packet(s)
-    # print('  <<< READ {0}'.format(p))
-    return p
-
-def clear_read_buffer(dev):
-    while True:
-        try:
-            read_packet(dev, timeout=100)
-        except:
-            break
-
-def query(dev, packets):
-    rs = []
-    for p in packets:
-        write_packet(dev, p)
-    p = None
-    while p is None or p.t != PType.COMPLETE:
-        p = read_packet(dev)
-        rs.append(p)
-    return rs
 
 def read_flights(alti):
     flights = []
@@ -268,11 +280,6 @@ if dev is None:
 # dev.set_configuration()
 # cfg = dev.get_active_configuration()
 # intf = cfg[(0,0)]
-
-# ep = usb.util.find_descriptor(intf,
-
-clear_read_buffer(dev)
-write_packet(dev, Packet(0, PType.RESET))
 
 alti = Altimeter(dev)
 alti.settings()
